@@ -3,7 +3,9 @@
     "start": "nodemon index.js"
   },
   "dependencies": {
-    "express": "^4.21.0"
+    "express": "^4.21.0",
+    "morgan": "^1.10.1",
+    "winston": "^3.18.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

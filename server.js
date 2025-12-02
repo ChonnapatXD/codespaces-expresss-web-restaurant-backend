@@ -1,51 +1,52 @@
-require('./tracing');  // Import the tracing 
+require('./tracing');  // Import tracing for OpenTelemetry
 
 const express = require("express");
+const morgan = require("morgan");
+const winston = require("winston");
+const path = require("path");
+
 const mappingRoute = require("./routes/mapping.route");
 const userRoute = require("./routes/user.route");
 const { metricsExporter } = require("./middlewares/metrics");
 const { port } = require("./config/awsSecretsManager");
-const winston = require("winston");
 
-// ----------------------
-// Logger configuration
-// ----------------------
+const app = express();
+
+// --- ตั้ง logger ด้วย Winston ---
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.combine(
     winston.format.timestamp(),
-    winston.format.printf(({ timestamp, level, message }) => {
-      return `${timestamp} [${level.toUpperCase()}] ${message}`;
-    })
+    winston.format.json()   // ใช้ JSON format (structured log)
   ),
   transports: [
-    new winston.transports.Console(), // log ลง console
-    new winston.transports.File({ filename: "logs/app.log" }) // log ลงไฟล์
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: path.join("logs","app.log") })
   ]
 });
 
-const app = express();
+// --- ใช้ Morgan เป็น HTTP request logger + bind กับ Winston ---
+// สร้าง custom stream ให้ Morgan ส่ง log ไปยัง Winston
+app.use(morgan("combined", {
+  stream: {
+    write: message => logger.info(message.trim())
+  }
+}));
+
+// --- (ถ้าต้องการ) ใช้ custom middleware ก่อน route เพื่อ log request details ---
+// แต่วิธีด้านบนด้วย Morgan — พอแล้วสำหรับ HTTP request
 
 app.use(metricsExporter);
 app.use(express.json());
 
-// Log ทุก request
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.url}`);
-  next();
-});
-
-// Routes
 app.use(mappingRoute);
 app.use(userRoute);
 
-// Health check
 app.get("/health", (req, res) => {
-  logger.info("Health check accessed");
+  logger.info("Health check endpoint called");
   res.send("The application is healthy");
 });
 
-// Start server
 app.listen(port, () => {
   logger.info(`Server is running on port ${port}`);
 });
