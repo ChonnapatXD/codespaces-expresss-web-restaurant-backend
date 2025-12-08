@@ -1,19 +1,24 @@
-const { createLogger, transports, format } = require('winston');
+const winston = require('winston');
+const pino = require('pino-loki');
 
-const logger = createLogger({
-  format: format.combine(
-    format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
-    format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`)
-  ),
-  transports: [
-    new transports.File({
-      filename: './logs/all-logs.log',
-      json: false,
-      maxsize: 5242880,
-      maxFiles: 5,
-    }),
-    new transports.Console(),
-  ]
+const transport = pino.transport({
+  target: "pino-loki",
+  options: {
+    batching: true,
+    interval: 5,
+    host: 'http://loki:3100', // ถ้ารัน local ผ่าน docker compose
+    basicAuth: {
+      username: "username",
+      password: "password",
+    },
+  },
 });
 
-module.exports = logger;
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  transports: [
+    transport,
+    new winston.transports.Console(),
+  ],
+});
