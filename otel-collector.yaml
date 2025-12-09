@@ -3,39 +3,38 @@ receivers:
     protocols:
       grpc:
       http:
-  prometheus:
-    config:
-      scrape_configs:
-        - job_name: 'otel-collector'
-          static_configs:
-            - targets: ['localhost:8888']
-  filelog:
-    include: [ "/var/log/node/*.log" ]
-    start_at: beginning
+
+processors:
+  batch:
 
 exporters:
-  otlp:
+  otlp/tempo:
     endpoint: tempo:4317
     tls:
       insecure: true
+
   prometheus:
     endpoint: "0.0.0.0:8889"
-  loki:
+
+  otlp/logs:
     endpoint: http://loki:3100/loki/api/v1/push
     labels:
-      attributes:
-        service.name: ""
+      resource:
+        service.name: "restaurant-backend"
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo]
 
     metrics:
       receivers: [otlp]
+      processors: [batch]
       exporters: [prometheus]
 
     logs:
-      receivers: [filelog]
+      receivers: [otlp]
+      processors: [batch]
       exporters: [loki]

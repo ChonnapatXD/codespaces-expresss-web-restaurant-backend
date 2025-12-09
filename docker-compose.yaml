@@ -1,38 +1,41 @@
-# /infra/apm/docker-compose.yaml
 version: '3'
+
 services:
-  # Tempo runs as user 10001, and docker compose creates the volume as root.
-  # As such, we need to chown the volume in order for Tempo to start correctly.
+
   init:
     image: &tempoImage grafana/tempo:latest
     user: root
-    entrypoint:
-      - "chown"
-      - "10001:10001"
-      - "/var/tempo"
+    entrypoint: ["chown", "10001:10001", "/var/tempo"]
     volumes:
       - ./tempo-data:/var/tempo
+
   tempo:
     image: *tempoImage
-    command: [ "-config.file=/etc/tempo.yaml" ]
+    command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ../shared/tempo.yaml:/etc/tempo.yaml
       - ./tempo-data:/var/tempo
     ports:
-      - "3200" # tempo
-      - "4317" # otlp grpc
+      - "3200:3200"   # Tempo Query
     depends_on:
       - init
-  # And put them in an OTEL collector pipeline...
+    networks:
+      - monitoring
+
   otel-collector:
     image: otel/opentelemetry-collector:0.86.0
-    command: [ "--config=/etc/otel-collector.yaml" ]
+    command: ["--config=/etc/otel-collector.yaml"]
     volumes:
       - ./otel-collector.yaml:/etc/otel-collector.yaml
-      - ../logs:/var/log/node    # <<<<< จําเป็นมาก
     ports:
       - "4317:4317"
+      - "4318:4318"
       - "8889:8889"
+    depends_on:
+      - tempo
+      - loki
+    networks:
+      - monitoring
 
   prometheus:
     image: prom/prometheus:latest
@@ -42,13 +45,16 @@ services:
       - --enable-feature=exemplar-storage
       - --enable-feature=native-histograms
     volumes:
-      - ../shared/prometheus.yaml:/etc/prometheus.yaml
+      - ./prometheus.yaml:/etc/prometheus.yaml
     ports:
       - "9090:9090"
+    networks:
+      - monitoring
+
   grafana:
     image: grafana/grafana:latest
     ports:
-      - '3000:3000'
+      - "3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
     depends_on:
@@ -59,7 +65,7 @@ services:
   loki:
     image: grafana/loki:latest
     ports:
-      - '3100:3100'
+      - "3100:3100"
     volumes:
       - loki-data:/data
     networks:
@@ -70,4 +76,4 @@ networks:
 
 volumes:
   grafana-data:
-  loki-data:      
+  loki-data:
