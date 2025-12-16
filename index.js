@@ -1,9 +1,24 @@
+// โหลด ENV ก่อนทุกอย่าง
+require("dotenv").config();
+// โหลด OpenTelemetry (ต้องมาก่อน express)
+const { initOpenTelemetry } = require("./tracing");
+initOpenTelemetry();
+
+const logger = require("./logger");
+
+logger.info("Server started");
+logger.info({ msg: "This is structured log" });
+logger.error("This is an error log");
+
+
 const express = require('express')
 const app = express()
-const bodyParser = require('body-parser')
 const port = 5000
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({extended:false}))
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+
+console.log("TEMPO_URL =", process.env.TEMPO_URL);
 
 app.use((req,res,next)=>{
   res.setHeader("Access-Control-Allow-Origin","*");
@@ -300,6 +315,39 @@ app.delete('/api/menudrink/:id', (req, res) => {
   }
 })
 
+
+logger.info("Logs form logger");
+for (let i = 0; i < 10; i++) {
+  logger.info(`Test log ${i}`);
+}
+
+app.use((req, res, next) => {
+  logger.info({ method: req.method, url: req.url });
+  next();
+});
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`)
 })
+
+
+
+const { trace } = require("@opentelemetry/api");
+const tracer = trace.getTracer("app-tracer");
+
+app.get("/test-span", (req, res) => {
+  const span = tracer.startSpan("test-span");
+  // ทำงานใดๆ
+  span.end();
+  res.send("Span created");
+});
+
+app.get('/api/test-trace', (req, res) => {
+  const tracer = require('@opentelemetry/api').trace.getTracer('core');
+  for (let i = 0; i < 50; i++) {
+    const span = tracer.startSpan(`test-span-${i}`);
+    span.end();
+  }
+  res.send('50 spans sent!');
+});
+

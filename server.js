@@ -9,6 +9,7 @@ const mappingRoute = require("./routes/mapping.route");
 const userRoute = require("./routes/user.route");
 const { metricsExporter } = require("./middlewares/metrics");
 const { port } = require("./config/awsSecretsManager");
+require("dotenv").config();
 
 const app = express();
 
